@@ -1,4 +1,4 @@
-The code performs classification using the unsupervised, iterative algorithm K-Means clustering.  
+Theis code performs clustering using the unsupervised, iterative algorithm K-Means.
 This creates groups that have similar characteristics within the data.  
 
 ## How it works

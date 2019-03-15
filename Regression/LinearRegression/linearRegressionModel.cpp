@@ -1,62 +1,68 @@
 #include "linearRegressionModel.h"
 #include <vector>
 
-LinearRegressionModel::LinearRegressionModel(std::vector<double>& xVals, std::vector<double> yVals)
-		: m_xVals(xVals), m_yVals(yVals), m_num_elems(yVals.size()), m_old_error(std::numeric_limits<double>::max()){}
+Point::Point(double x, double y)
+	: x(x), y(y) {}
 
-void LinearRegressionModel::computeGradients(std::vector<double>& gradients)
+LinearRegressionModel::LinearRegressionModel(std::vector<Point>& points)
+		: m_points(points), m_old_error(std::numeric_limits<double>::max()) {}
+
+std::vector<double> LinearRegressionModel::makePredictions()
 {
-	// Compute gradient of error with respect to a
-	for (int i = 0; i < m_num_elems; ++i)
-		gradients[0] += m_xVals[i] * ((m_a * m_xVals[i] + m_b)) - m_yVals[i];
-	gradients[0] /= m_num_elems * 0.5;
-	
-	// Compute gradient of error with respect to b
-	for (int i = 0; i < m_num_elems; ++i)
-		gradients[1] += ((m_a * m_xVals[i] + m_b)) - m_yVals[i];
-	gradients[1] /= m_num_elems * 0.5;
+	std::vector<double> predictions;
+	for (Point point : m_points)
+	{
+		double prediction = regress(point.x);
+		predictions.push_back(prediction);
+	}
+	return predictions;
 }
 
-void LinearRegressionModel::takeStep(double step, std::vector<double>& gradients)
+std::vector<double> LinearRegressionModel::calculateErrors(std::vector<double>& predictions)
 {
-	m_a -= step * gradients[0];
-	m_b -= step * gradients[1];
+	std::vector<double> errors;
+	for (unsigned int i = 0; i < m_points.size(); ++i)
+		errors.emplace_back(predictions[i] - m_points[i].y);
+	return errors;
 }
 
-void LinearRegressionModel::train(int maxIterations, double aInitialValue, double bInitialValue)
+// Changes the coefficients to better fit the line
+void LinearRegressionModel::updateCoefficients(std::vector<double>& predictions, std::vector<double>& errors)
+{
+	for (unsigned int i = 0; i < predictions.size(); ++i)
+	{
+		m_a -= learningRate * errors[i] * m_points[i].x;
+		m_b -= learningRate * errors[i];
+	}
+}
+
+void LinearRegressionModel::train(int iterations, double aInitialValue, double bInitialValue)
 {
 	m_a = aInitialValue;
 	m_b = bInitialValue;
 
-	for (int currentIteration = 0; !isConverged() && currentIteration < maxIterations; ++currentIteration)
-	{
-		double step = 2.0 / static_cast<double>(currentIteration + 2);
-
-		std::vector<double> gradients = { 0, 0 };
-
-		computeGradients(gradients);
-		takeStep(step, gradients);
-
-		std::cout
-			<< "Coefficient A:\t" << m_a
-			<< "\nCoefficient B:\t" << m_b
-			<< "\nGradient A:\t" << gradients[0]
-			<< "\nGradient B:\t" << gradients[1]
-			<< "\n";
-	}
+	for (int currentIteration = 0; !isConverged() && currentIteration < iterations; ++currentIteration)
+		for (unsigned int i = 0; i < m_points.size(); ++i)
+		{
+			std::vector<double> predictions = makePredictions();
+			std::vector<double> errors = calculateErrors(predictions);
+			updateCoefficients(predictions, errors);
+		}
 }
 
 bool LinearRegressionModel::isConverged()
 {
 	double error = 0;
-	double threshold = 0.001;
-	for(int i = 0; i < m_num_elems; ++i)
-		error += pow(m_a * m_xVals[i] + m_b - m_yVals[i], 2);
-	error /= m_num_elems;
+	double threshold = 0.000002;
+
+	for(unsigned int i = 0; i < m_points.size(); ++i)
+		error += pow(m_a * m_points[i].x + m_b - m_points[i].y, 2);
+	error /= m_points.size();
 	std::cout << "Error: " << error << "\r\n";
-	
-	bool res = (abs(error) < m_old_error - threshold && abs(error) > m_old_error + threshold);
-	m_old_error = abs(error);
+
+	bool res = (fabs(error) > m_old_error - threshold && fabs(error) < m_old_error + threshold);
+	m_old_error = fabs(error);
+
 	return res;
 }
 
